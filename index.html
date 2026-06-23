@@ -288,7 +288,20 @@
     <section class="card">
       <form id="attendanceForm" novalidate>
         <div class="notice">
-          系統將以伺服器時間記錄簽到時間，並記錄您授權提供的手機定位座標與定位誤差。
+          系統將以伺服器時間記錄簽到時間，並記錄您授權提供的手機定位，以及由本網站產生的瀏覽器裝置識別碼（非 IMEI）。
+        </div>
+
+        <div class="field">
+          <label class="required" for="department">課別</label>
+          <input
+            id="department"
+            name="department"
+            type="text"
+            maxlength="20"
+            autocomplete="organization"
+            placeholder="例如：台北五課"
+            required
+          >
         </div>
 
         <div class="field">
@@ -349,7 +362,7 @@
 
         <label class="consent">
           <input id="consent" type="checkbox" required>
-          <span>我已閱讀下方資料蒐集告知，並同意提供本次簽到所需資料與裝置定位。</span>
+          <span>我已閱讀下方資料蒐集告知，並同意提供本次簽到資料、裝置定位及瀏覽器裝置識別碼（非 IMEI）。</span>
         </label>
 
         <button id="submitBtn" class="submit-btn" type="submit">送出簽到</button>
@@ -373,6 +386,7 @@
       const config = window.ATTENDANCE_CONFIG || {};
       const form = document.getElementById("attendanceForm");
       const eventName = document.getElementById("eventName");
+      const department = document.getElementById("department");
       const storeNo = document.getElementById("storeNo");
       const storeName = document.getElementById("storeName");
       const attendeeName = document.getElementById("attendeeName");
@@ -389,6 +403,7 @@
       let positionData = null;
       let submitting = false;
       let pendingSubmission = null;
+      const browserDeviceId = getOrCreateBrowserDeviceId();
 
       eventName.textContent = config.EVENT_NAME || "會議簽到";
       document.title = `${eventName.textContent}｜簽到`;
@@ -482,9 +497,16 @@
 
         if (submitting) return;
 
+        const cleanDepartment = department.value.trim();
         const cleanStoreNo = storeNo.value.trim();
         const cleanStoreName = storeName.value.trim();
         const cleanAttendeeName = attendeeName.value.trim();
+
+        if (!cleanDepartment) {
+          showMessage("請填寫課別，例如：台北五課。", "error");
+          department.focus();
+          return;
+        }
 
         if (!/^\d{6}$/.test(cleanStoreNo)) {
           showMessage("店號必須為 6 碼數字，例如 005989。", "error");
@@ -523,7 +545,8 @@
           return;
         }
 
-        const duplicateKey = `${config.EVENT_NAME}|${cleanStoreNo}|${cleanAttendeeName}`;
+        const duplicateKey =
+          `${config.EVENT_NAME}|${cleanDepartment}|${cleanStoreNo}|${cleanAttendeeName}`;
         const lastSubmit = readLastSubmit();
 
         if (lastSubmit &&
@@ -537,6 +560,7 @@
         const payload = {
           submissionId,
           eventName: String(config.EVENT_NAME || "會議簽到"),
+          department: cleanDepartment,
           storeNo: cleanStoreNo,
           storeName: cleanStoreName,
           attendeeName: cleanAttendeeName,
@@ -546,6 +570,8 @@
           clientTime: new Date().toISOString(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
           userAgent: navigator.userAgent || "",
+          browserDeviceId,
+          deviceIdType: "browser-local-v1",
           pageUrl: location.href,
           consent: "yes",
           website: document.getElementById("website").value
@@ -556,6 +582,7 @@
         try {
           postToBackend(payload, {
             duplicateKey,
+            department: cleanDepartment,
             storeNo: cleanStoreNo,
             storeName: cleanStoreName,
             attendeeName: cleanAttendeeName
@@ -636,6 +663,7 @@
           form.style.display = "none";
           receipt.classList.add("show");
           receiptText.textContent =
+            `${pending.receiptData.department}／` +
             `${pending.receiptData.storeNo} ${pending.receiptData.storeName}／` +
             `${pending.receiptData.attendeeName}，` +
             `簽到時間：${data.serverTime || new Date().toLocaleString("zh-TW")}`;
@@ -693,6 +721,21 @@
           return window.crypto.randomUUID();
         }
         return `att-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+      }
+
+      function getOrCreateBrowserDeviceId() {
+        const key = "meetingAttendanceBrowserDeviceId";
+        try {
+          let id = localStorage.getItem(key);
+          if (!id) {
+            id = `browser-${makeId()}`;
+            localStorage.setItem(key, id);
+          }
+          return id;
+        } catch (error) {
+          console.warn("無法使用 localStorage，改用本次頁面識別碼。", error);
+          return `session-${makeId()}`;
+        }
       }
 
       function round(value, digits) {
