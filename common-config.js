@@ -1,6 +1,6 @@
 window.ATTENDANCE_COMMON_CONFIG = Object.freeze({
   // 將原本已部署、結尾為 /exec 的 Apps Script 網址貼在這裡。
-  APPS_SCRIPT_URL: "請貼上_APPS_SCRIPT_部署網址",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxdmt6QYHBDerS9zv7yjYu_RBsJ2RNiG90qFL0dMHQkVFoj4BHb7nUQhZyEExQyKy66/exec",
 
   REQUIRE_LOCATION: true,
   LOCATION_TIMEOUT_MS: 20000,
