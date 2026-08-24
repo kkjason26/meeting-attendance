@@ -288,7 +288,7 @@
     <section class="card">
       <form id="attendanceForm" novalidate>
         <div class="notice">
-          系統將以伺服器時間記錄簽到時間，並記錄您授權提供的手機定位，以及由本網站產生的瀏覽器裝置識別碼（非 IMEI）。
+          系統將以伺服器時間記錄簽到時間，並記錄您授權提供的手機定位座標與定位誤差。
         </div>
 
         <div class="field">
@@ -362,7 +362,7 @@
 
         <label class="consent">
           <input id="consent" type="checkbox" required>
-          <span>我已閱讀下方資料蒐集告知，並同意提供本次簽到資料、裝置定位及瀏覽器裝置識別碼（非 IMEI）。</span>
+          <span>我已閱讀下方資料蒐集告知，並同意提供本次簽到資料與裝置定位。</span>
         </label>
 
         <button id="submitBtn" class="submit-btn" type="submit">送出簽到</button>
@@ -442,7 +442,7 @@
         );
       }
 
-      if (!/^(0903AM|0903PM|0904AM|0904PM)$/.test(eventCode)) {
+      if (!/^(0902PM1|0902PM2|0903AM|0903PM1|0903PM2|0904AM|0904PM1|0904PM2)$/.test(eventCode)) {
         showMessage(
           "本頁的場次代碼設定錯誤，請聯絡主辦單位。",
           "error"
@@ -559,7 +559,7 @@
           return;
         }
 
-        if (!/^(0903AM|0903PM|0904AM|0904PM)$/.test(eventCode)) {
+        if (!/^(0902PM1|0902PM2|0903AM|0903PM1|0903PM2|0904AM|0904PM1|0904PM2)$/.test(eventCode)) {
           showMessage("場次設定錯誤，無法送出。", "error");
           return;
         }
