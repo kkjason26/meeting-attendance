@@ -411,6 +411,7 @@
       const lastSubmitStorageKey =
         `meetingAttendanceLastSubmit_${eventCode || "UNKNOWN"}`;
       const browserDeviceId = getOrCreateBrowserDeviceId();
+      const deviceFingerprint = buildDeviceFingerprint();
 
       eventName.textContent = config.EVENT_NAME || "會議簽到";
       document.title = `${eventName.textContent}｜簽到`;
@@ -591,7 +592,8 @@
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
           userAgent: navigator.userAgent || "",
           browserDeviceId,
-          deviceIdType: "browser-local-v1",
+          deviceFingerprint,
+          deviceIdType: "browser-local-v1+device-code-v1",
           pageUrl: location.href,
           consent: "yes",
           website: document.getElementById("website").value
@@ -742,6 +744,72 @@
         }
         return `att-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
       }
+
+
+      function buildDeviceFingerprint() {
+        const nav = window.navigator || {};
+        const screenInfo = window.screen || {};
+        const languageList = Array.isArray(nav.languages) && nav.languages.length
+          ? nav.languages.join(",")
+          : (nav.language || "");
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        const uaFamily = normalizeUserAgentFamily(nav.userAgent || "");
+
+        const profile = [
+          "device-device-code-v1",
+          uaFamily,
+          nav.platform || "",
+          languageList,
+          timeZone,
+          screenInfo.width || "",
+          screenInfo.height || "",
+          screenInfo.availWidth || "",
+          screenInfo.availHeight || "",
+          screenInfo.colorDepth || "",
+          screenInfo.pixelDepth || "",
+          window.devicePixelRatio || "",
+          nav.maxTouchPoints || "",
+          nav.hardwareConcurrency || "",
+          "ontouchstart" in window ? "touch" : "no-touch"
+        ].join("|");
+
+        return `fp-${hashText(profile)}`;
+      }
+
+      function normalizeUserAgentFamily(userAgent) {
+        const ua = String(userAgent || "");
+        const ios = ua.match(/(?:iPhone|iPad).*?OS\s([\d_]+)/i);
+        if (ios) return `iOS-${ios[1].replace(/_/g, ".")}`;
+
+        const android = ua.match(/Android\s([\d.]+)/i);
+        if (android) return `Android-${android[1]}`;
+
+        const windows = ua.match(/Windows NT\s([\d.]+)/i);
+        if (windows) return `Windows-${windows[1]}`;
+
+        const mac = ua.match(/Mac OS X\s([\d_]+)/i);
+        if (mac) return `Mac-${mac[1].replace(/_/g, ".")}`;
+
+        return ua.slice(0, 80);
+      }
+
+      function hashText(text) {
+        let h1 = 0x811c9dc5;
+        let h2 = 0x01000193;
+
+        for (let i = 0; i < text.length; i++) {
+          const code = text.charCodeAt(i);
+          h1 ^= code;
+          h1 = Math.imul(h1, 0x01000193);
+          h2 ^= code + i;
+          h2 = Math.imul(h2, 0x85ebca6b);
+        }
+
+        const part1 = (h1 >>> 0).toString(36).padStart(7, "0");
+        const part2 = (h2 >>> 0).toString(36).padStart(7, "0");
+        return `${part1}${part2}`.slice(0, 18);
+      }
+
 
       function getOrCreateBrowserDeviceId() {
         const key =
