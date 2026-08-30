@@ -373,7 +373,7 @@
           <div class="kpi">
             <div class="label">出席率</div>
             <div class="value" id="kpiRate">—</div>
-            <div class="sub">依「場次設定」預計人數計算</div>
+            <div class="sub">依課別對照自動加總</div>
           </div>
           <div class="kpi warn">
             <div class="label">時間待確認</div>
@@ -445,7 +445,7 @@
                 <th class="num">時間待確認</th>
                 <th class="num">位置待確認</th>
                 <th class="num">場地未設定</th>
-                <th class="num">裝置待確認</th>
+                <th class="num">裝置異常</th>
                 <th>最近簽到</th>
               </tr>
             </thead>
@@ -474,7 +474,7 @@
                 <th class="num">疑似重複</th>
                 <th class="num">時間待確認</th>
                 <th class="num">定位待確認</th>
-                <th class="num">裝置待確認</th>
+                <th class="num">裝置異常</th>
                 <th>最近簽到</th>
               </tr>
             </thead>
@@ -486,7 +486,7 @@
       <section class="card" id="orgCard">
         <div class="section-title">
           <h2>本部／部別／課別出席率分析</h2>
-          <span class="updated">預計人數來源：Google 試算表「營業課別對照」</span>
+          <span class="updated">預計人數來源：「課別場地設定」＋「營業課別對照」</span>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="filters">
@@ -1078,7 +1078,7 @@
           "時間待確認",
           "位置待確認",
           "場地未設定",
-          "裝置待確認",
+          "裝置異常",
           "最近簽到"
         ];
 
