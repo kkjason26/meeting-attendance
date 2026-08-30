@@ -496,6 +496,7 @@
               <option value="courses">課別</option>
             </select>
             <input id="orgSearch" type="search" placeholder="搜尋本部、部別或課別">
+            <button id="orgRefreshBtn" type="button" class="secondary">重新整理</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -544,6 +545,9 @@
       const connectionBadge = document.getElementById("connectionBadge");
       const eventFilter = document.getElementById("eventFilter");
       const deptSearch = document.getElementById("deptSearch");
+      const orgLevelFilter = document.getElementById("orgLevelFilter");
+      const orgSearch = document.getElementById("orgSearch");
+      const orgRefreshBtn = document.getElementById("orgRefreshBtn");
       const refreshHint = document.getElementById("refreshHint");
 
       const storedKeyName = "meetingAttendanceDashboardAccessKey";
@@ -565,8 +569,22 @@
       refreshBtn.addEventListener("click", () => loadDashboard(false));
       exportBtn.addEventListener("click", exportDepartmentCsv);
       logoutBtn.addEventListener("click", logout);
-      eventFilter.addEventListener("change", renderAll);
-      deptSearch.addEventListener("input", renderDepartments);
+      eventFilter.addEventListener("change", () => {
+        renderKpis();
+        renderEvents();
+        renderDepartments();
+        renderVenues();
+        renderOrganization();
+      });
+      deptSearch.addEventListener("input", () => {
+        renderDepartments();
+        renderVenues();
+      });
+      orgLevelFilter.addEventListener("change", renderOrganization);
+      orgSearch.addEventListener("keydown", event => {
+        if (event.key === "Enter") renderOrganization();
+      });
+      orgRefreshBtn.addEventListener("click", renderOrganization);
       accessKeyInput.addEventListener("keydown", event => {
         if (event.key === "Enter") loadDashboard(true);
       });
@@ -687,14 +705,55 @@
         renderOrganization();
       }
 
+      function getSelectedEventSummary() {
+        const eventCode = eventFilter.value;
+        if (!eventCode) return lastData.total || {};
+        return (lastData.events || []).find(event => event.eventCode === eventCode) || {};
+      }
+
+      function getEventFilteredTotals(level, keyword) {
+        const eventCode = eventFilter.value;
+        const rows = getOrganizationRows(level).filter(item => {
+          const text = [item.headquarters, item.division, item.departmentName, item.departmentCode]
+            .filter(Boolean).join(" ").toLowerCase();
+          const matchKeyword = !keyword || text.includes(keyword);
+          const matchEvent = !eventCode || orgItemHasRecordInEvent(item, eventCode);
+          return matchKeyword && matchEvent;
+        });
+
+        return rows.reduce((sum, item) => {
+          sum.expectedCount += Number(item.expectedCount || 0);
+          sum.effectiveCount += Number(item.effectiveCount || 0);
+          sum.signedStoreCount += Number(item.signedStoreCount || 0);
+          sum.totalRecords += Number(item.totalRecords || 0);
+          sum.pendingCount += Number(item.pendingCount || 0);
+          sum.timePendingCount += Number(item.timePendingCount || 0);
+          sum.locationPendingCount += Number(item.locationPendingCount || 0);
+          return sum;
+        }, {
+          expectedCount: 0,
+          effectiveCount: 0,
+          signedStoreCount: 0,
+          totalRecords: 0,
+          pendingCount: 0,
+          timePendingCount: 0,
+          locationPendingCount: 0
+        });
+      }
+
       function renderKpis() {
-        const total = lastData.total || {};
+        const total = getSelectedEventSummary();
         document.getElementById("generatedAt").textContent =
           `更新時間：${lastData.generatedAt || "—"}`;
-        document.getElementById("kpiEffective").textContent = number(total.effectiveCount);
+
+        const expectedCount = Number(total.expectedCount || 0);
+        const effectiveCount = Number(total.effectiveCount || 0);
+        const attendanceRate = expectedCount > 0 ? effectiveCount / expectedCount : "";
+
+        document.getElementById("kpiEffective").textContent = number(effectiveCount);
         document.getElementById("kpiExpected").textContent =
-          `預計 ${number(total.expectedCount)} 人`;
-        document.getElementById("kpiRate").textContent = percent(total.attendanceRate);
+          `預計 ${number(expectedCount)} 人`;
+        document.getElementById("kpiRate").textContent = percent(attendanceRate);
         document.getElementById("kpiTimePending").textContent = number(total.timePendingCount);
         document.getElementById("kpiLocationPending").textContent =
           number(Number(total.locationPendingCount || 0) + Number(total.venueMissingCount || 0));
@@ -717,7 +776,12 @@
       }
 
       function renderEvents() {
-        const rows = (lastData.events || []).map(event => {
+        const selectedEvent = eventFilter.value;
+        const events = (lastData.events || []).filter(event =>
+          !selectedEvent || event.eventCode === selectedEvent
+        );
+
+        const rows = events.map(event => {
           const statusClass = event.pendingCount > 0 || event.duplicateCount > 0
             ? "status-warn"
             : event.totalRecords > 0
@@ -754,7 +818,11 @@
         tbody.querySelectorAll("tr[data-event]").forEach(row => {
           row.addEventListener("click", () => {
             eventFilter.value = row.dataset.event || "";
+            renderKpis();
+            renderEvents();
             renderDepartments();
+            renderVenues();
+            renderOrganization();
           });
         });
       }
@@ -852,32 +920,134 @@
       }
 
 
+      function getOrganizationRows(level) {
+        if (!lastData || !lastData.organization) return [];
+
+        // 全部場次：直接使用後端已彙總的組織統計。
+        if (!eventFilter.value) {
+          return lastData.organization[level] || [];
+        }
+
+        // 指定場次：用該場次的課別明細即時彙總，避免組織分析仍顯示全體資料。
+        const eventCode = eventFilter.value;
+        const courseMeta = new Map();
+        (lastData.organization.courses || []).forEach(item => {
+          if (item.departmentCode) courseMeta.set(String(item.departmentCode), item);
+          if (item.departmentName) courseMeta.set(String(item.departmentName), item);
+        });
+
+        const courseRows = (lastData.departments || [])
+          .filter(item => item.eventCode === eventCode)
+          .map(item => {
+            const meta = courseMeta.get(String(item.department || "")) || {};
+            return {
+              headquarters: meta.headquarters || "",
+              division: meta.division || "",
+              departmentName: meta.departmentName || item.department || "",
+              departmentCode: meta.departmentCode || "",
+              expectedCount: Number(meta.expectedCount || 0),
+              effectiveCount: Number(item.effectiveCount || 0),
+              signedStoreCount: Number(item.signedStoreCount || 0),
+              totalRecords: Number(item.totalRecords || 0),
+              pendingCount: Number(item.pendingCount || 0),
+              timePendingCount: Number(item.timePendingCount || 0),
+              locationPendingCount: Number(item.locationPendingCount || 0) + Number(item.venueMissingCount || 0)
+            };
+          });
+
+        if (level === "courses") return courseRows;
+
+        const keyFields = level === "headquarters"
+          ? ["headquarters"]
+          : ["headquarters", "division"];
+
+        const map = new Map();
+        courseRows.forEach(item => {
+          const key = keyFields.map(field => item[field] || "未對照").join("\u0001");
+          if (!map.has(key)) {
+            map.set(key, {
+              headquarters: item.headquarters || "未對照",
+              division: level === "divisions" ? (item.division || "未對照") : "",
+              departmentName: "",
+              departmentCode: "",
+              expectedCount: 0,
+              effectiveCount: 0,
+              signedStoreCount: 0,
+              totalRecords: 0,
+              pendingCount: 0,
+              timePendingCount: 0,
+              locationPendingCount: 0
+            });
+          }
+
+          const target = map.get(key);
+          target.expectedCount += Number(item.expectedCount || 0);
+          target.effectiveCount += Number(item.effectiveCount || 0);
+          target.signedStoreCount += Number(item.signedStoreCount || 0);
+          target.totalRecords += Number(item.totalRecords || 0);
+          target.pendingCount += Number(item.pendingCount || 0);
+          target.timePendingCount += Number(item.timePendingCount || 0);
+          target.locationPendingCount += Number(item.locationPendingCount || 0);
+        });
+
+        return Array.from(map.values()).sort((a, b) =>
+          [a.headquarters, a.division].join("").localeCompare([b.headquarters, b.division].join(""), "zh-Hant")
+        );
+      }
+
+      function orgItemHasRecordInEvent(item, eventCode) {
+        if (!eventCode) return true;
+
+        if (item.departmentName || item.departmentCode) {
+          return (lastData.departments || []).some(dept =>
+            dept.eventCode === eventCode &&
+            (
+              String(dept.department || "") === String(item.departmentName || "") ||
+              String(dept.department || "") === String(item.departmentCode || "")
+            )
+          );
+        }
+
+        const rows = getOrganizationRows("courses");
+        return rows.some(row => {
+          const matchHeadquarters = !item.headquarters || row.headquarters === item.headquarters;
+          const matchDivision = !item.division || row.division === item.division;
+          return matchHeadquarters && matchDivision;
+        });
+      }
+
       function renderOrganization() {
         if (!lastData || !lastData.organization) return;
-        const level = document.getElementById("orgLevelFilter").value || "headquarters";
-        const keyword = document.getElementById("orgSearch").value.trim().toLowerCase();
-        const data = lastData.organization[level] || [];
+        const level = orgLevelFilter.value || "headquarters";
+        const keyword = orgSearch.value.trim().toLowerCase();
+        const data = getOrganizationRows(level);
         const filtered = data.filter(item => {
           const text = [item.headquarters, item.division, item.departmentName, item.departmentCode]
             .filter(Boolean).join(" ").toLowerCase();
           return !keyword || text.includes(keyword);
         });
-        const rows = filtered.map(item => `
-          <tr>
-            <td>${escapeHtml(item.headquarters || "—")}</td>
-            <td>${escapeHtml(item.division || "—")}</td>
-            <td>${escapeHtml(item.departmentName || "—")}</td>
-            <td><strong>${escapeHtml(item.departmentCode || "—")}</strong></td>
-            <td class="num">${number(item.expectedCount)}</td>
-            <td class="num">${number(item.effectiveCount)}</td>
-            <td class="num">${percent(item.attendanceRate)}</td>
-            <td class="num">${number(item.signedStoreCount)}</td>
-            <td class="num">${number(item.totalRecords)}</td>
-            <td class="num">${number(item.pendingCount)}</td>
-            <td class="num">${number(item.timePendingCount)}</td>
-            <td class="num">${number(item.locationPendingCount)}</td>
-          </tr>
-        `);
+        const rows = filtered.map(item => {
+          const expected = Number(item.expectedCount || 0);
+          const effective = Number(item.effectiveCount || 0);
+          const attendanceRate = expected > 0 ? effective / expected : "";
+
+          return `
+            <tr>
+              <td>${escapeHtml(item.headquarters || "—")}</td>
+              <td>${escapeHtml(item.division || "—")}</td>
+              <td>${escapeHtml(item.departmentName || "—")}</td>
+              <td><strong>${escapeHtml(item.departmentCode || "—")}</strong></td>
+              <td class="num">${number(expected)}</td>
+              <td class="num">${number(effective)}</td>
+              <td class="num">${percent(attendanceRate)}</td>
+              <td class="num">${number(item.signedStoreCount)}</td>
+              <td class="num">${number(item.totalRecords)}</td>
+              <td class="num">${number(item.pendingCount)}</td>
+              <td class="num">${number(item.timePendingCount)}</td>
+              <td class="num">${number(item.locationPendingCount)}</td>
+            </tr>
+          `;
+        });
         document.getElementById("orgRows").innerHTML =
           rows.join("") || `<tr><td colspan="12">沒有符合條件的組織統計資料</td></tr>`;
       }
