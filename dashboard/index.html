@@ -454,6 +454,35 @@
         </div>
       </section>
 
+
+      <section class="card" id="venueCard">
+        <div class="section-title">
+          <h2>場地分流簽到統計</h2>
+          <span class="updated">同一課別多地點時，可查看實際匹配到的會場</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>場次</th>
+                <th>課別</th>
+                <th>匹配場地</th>
+                <th>地址</th>
+                <th class="num">有效出席</th>
+                <th class="num">已簽到店舖</th>
+                <th class="num">全部紀錄</th>
+                <th class="num">疑似重複</th>
+                <th class="num">時間待確認</th>
+                <th class="num">定位待確認</th>
+                <th class="num">裝置待確認</th>
+                <th>最近簽到</th>
+              </tr>
+            </thead>
+            <tbody id="venueRows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card" id="orgCard">
         <div class="section-title">
           <h2>本部／部別／課別出席率分析</h2>
@@ -654,6 +683,7 @@
         renderEventOptions();
         renderEvents();
         renderDepartments();
+        renderVenues();
         renderOrganization();
       }
 
@@ -769,6 +799,56 @@
 
         document.getElementById("deptRows").innerHTML =
           rows.join("") || `<tr><td colspan="11">沒有符合條件的課別資料</td></tr>`;
+      }
+
+
+
+      function renderVenues() {
+        const venueCard = document.getElementById("venueCard");
+        if (!venueCard) return;
+
+        if (!lastData.showDepartmentDetails) {
+          venueCard.classList.add("hidden");
+          return;
+        }
+
+        venueCard.classList.remove("hidden");
+
+        const eventCode = eventFilter.value;
+        const keyword = deptSearch.value.trim().toLowerCase();
+
+        const filtered = (lastData.venues || []).filter(item => {
+          const matchEvent = !eventCode || item.eventCode === eventCode;
+          const targetText = [
+            item.department,
+            item.eventName,
+            item.venueName,
+            item.venueAddress
+          ].join(" ").toLowerCase();
+
+          const matchKeyword = !keyword || targetText.includes(keyword);
+          return matchEvent && matchKeyword;
+        });
+
+        const rows = filtered.map(item => `
+          <tr>
+            <td><strong>${escapeHtml(item.eventCode)}</strong></td>
+            <td>${escapeHtml(item.department)}</td>
+            <td>${escapeHtml(item.venueName)}</td>
+            <td>${escapeHtml(item.venueAddress || "—")}</td>
+            <td class="num">${number(item.effectiveCount)}</td>
+            <td class="num">${number(item.signedStoreCount)}</td>
+            <td class="num">${number(item.totalRecords)}</td>
+            <td class="num">${number(item.duplicateCount)}</td>
+            <td class="num">${number(item.timePendingCount)}</td>
+            <td class="num">${number(Number(item.locationPendingCount || 0) + Number(item.venueMissingCount || 0))}</td>
+            <td class="num">${number(item.devicePendingCount)}</td>
+            <td>${escapeHtml(item.latestTime || "—")}</td>
+          </tr>
+        `);
+
+        document.getElementById("venueRows").innerHTML =
+          rows.join("") || `<tr><td colspan="12">尚無場地分流資料</td></tr>`;
       }
 
 
