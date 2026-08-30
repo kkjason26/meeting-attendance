@@ -193,7 +193,7 @@
 
     .kpis {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -376,9 +376,19 @@
             <div class="sub">依「場次設定」預計人數計算</div>
           </div>
           <div class="kpi warn">
-            <div class="label">待確認筆數</div>
+            <div class="label">時間待確認</div>
+            <div class="value" id="kpiTimePending">0</div>
+            <div class="sub">早到、逾時或未設定時間</div>
+          </div>
+          <div class="kpi warn">
+            <div class="label">定位待確認</div>
+            <div class="value" id="kpiLocationPending">0</div>
+            <div class="sub">超出合理距離或場地設定問題</div>
+          </div>
+          <div class="kpi warn">
+            <div class="label">全部待確認</div>
             <div class="value" id="kpiPending">0</div>
-            <div class="sub">位置、場地或裝置需人工確認</div>
+            <div class="sub">時間、位置、場地或裝置需人工確認</div>
           </div>
           <div class="kpi">
             <div class="label">全部簽到紀錄</div>
@@ -405,6 +415,8 @@
                 <th class="num">已簽到店舖</th>
                 <th class="num">全部紀錄</th>
                 <th class="num">疑似重複</th>
+                <th class="num">時間待確認</th>
+                <th class="num">定位待確認</th>
                 <th class="num">待確認</th>
                 <th>最近簽到</th>
                 <th>狀態</th>
@@ -430,6 +442,7 @@
                 <th class="num">已簽到店舖</th>
                 <th class="num">全部紀錄</th>
                 <th class="num">疑似重複</th>
+                <th class="num">時間待確認</th>
                 <th class="num">位置待確認</th>
                 <th class="num">場地未設定</th>
                 <th class="num">裝置待確認</th>
@@ -440,6 +453,45 @@
           </table>
         </div>
       </section>
+
+      <section class="card" id="orgCard">
+        <div class="section-title">
+          <h2>本部／部別／課別出席率分析</h2>
+          <span class="updated">預計人數來源：Google 試算表「營業課別對照」</span>
+        </div>
+        <div class="toolbar" style="margin-bottom:12px">
+          <div class="filters">
+            <select id="orgLevelFilter" aria-label="選擇組織層級">
+              <option value="headquarters">本部</option>
+              <option value="divisions">部別</option>
+              <option value="courses">課別</option>
+            </select>
+            <input id="orgSearch" type="search" placeholder="搜尋本部、部別或課別">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>營業本部</th>
+                <th>營業部</th>
+                <th>營業課</th>
+                <th>課別代號</th>
+                <th class="num">預計人數</th>
+                <th class="num">有效出席</th>
+                <th class="num">出席率</th>
+                <th class="num">已簽到店舖</th>
+                <th class="num">全部紀錄</th>
+                <th class="num">待確認</th>
+                <th class="num">時間待確認</th>
+                <th class="num">定位待確認</th>
+              </tr>
+            </thead>
+            <tbody id="orgRows"></tbody>
+          </table>
+        </div>
+      </section>
+
     </section>
   </main>
 
@@ -602,6 +654,7 @@
         renderEventOptions();
         renderEvents();
         renderDepartments();
+        renderOrganization();
       }
 
       function renderKpis() {
@@ -612,6 +665,9 @@
         document.getElementById("kpiExpected").textContent =
           `預計 ${number(total.expectedCount)} 人`;
         document.getElementById("kpiRate").textContent = percent(total.attendanceRate);
+        document.getElementById("kpiTimePending").textContent = number(total.timePendingCount);
+        document.getElementById("kpiLocationPending").textContent =
+          number(Number(total.locationPendingCount || 0) + Number(total.venueMissingCount || 0));
         document.getElementById("kpiPending").textContent = number(total.pendingCount);
         document.getElementById("kpiTotal").textContent = number(total.totalRecords);
         document.getElementById("kpiStores").textContent =
@@ -653,6 +709,8 @@
               <td class="num">${number(event.signedStoreCount)}</td>
               <td class="num">${number(event.totalRecords)}</td>
               <td class="num">${number(event.duplicateCount)}</td>
+              <td class="num">${number(event.timePendingCount)}</td>
+              <td class="num">${number(Number(event.locationPendingCount || 0) + Number(event.venueMissingCount || 0))}</td>
               <td class="num">${number(event.pendingCount)}</td>
               <td>${escapeHtml(event.latestTime || "—")}</td>
               <td><span class="status-pill ${statusClass}">${statusText}</span></td>
@@ -661,7 +719,7 @@
         });
 
         const tbody = document.getElementById("eventRows");
-        tbody.innerHTML = rows.join("") || `<tr><td colspan="11">尚無資料</td></tr>`;
+        tbody.innerHTML = rows.join("") || `<tr><td colspan="13">尚無資料</td></tr>`;
 
         tbody.querySelectorAll("tr[data-event]").forEach(row => {
           row.addEventListener("click", () => {
@@ -701,6 +759,7 @@
             <td class="num">${number(item.signedStoreCount)}</td>
             <td class="num">${number(item.totalRecords)}</td>
             <td class="num">${number(item.duplicateCount)}</td>
+            <td class="num">${number(item.timePendingCount)}</td>
             <td class="num">${number(item.locationPendingCount)}</td>
             <td class="num">${number(item.venueMissingCount)}</td>
             <td class="num">${number(item.devicePendingCount)}</td>
@@ -709,7 +768,38 @@
         `);
 
         document.getElementById("deptRows").innerHTML =
-          rows.join("") || `<tr><td colspan="10">沒有符合條件的課別資料</td></tr>`;
+          rows.join("") || `<tr><td colspan="11">沒有符合條件的課別資料</td></tr>`;
+      }
+
+
+      function renderOrganization() {
+        if (!lastData || !lastData.organization) return;
+        const level = document.getElementById("orgLevelFilter").value || "headquarters";
+        const keyword = document.getElementById("orgSearch").value.trim().toLowerCase();
+        const data = lastData.organization[level] || [];
+        const filtered = data.filter(item => {
+          const text = [item.headquarters, item.division, item.departmentName, item.departmentCode]
+            .filter(Boolean).join(" ").toLowerCase();
+          return !keyword || text.includes(keyword);
+        });
+        const rows = filtered.map(item => `
+          <tr>
+            <td>${escapeHtml(item.headquarters || "—")}</td>
+            <td>${escapeHtml(item.division || "—")}</td>
+            <td>${escapeHtml(item.departmentName || "—")}</td>
+            <td><strong>${escapeHtml(item.departmentCode || "—")}</strong></td>
+            <td class="num">${number(item.expectedCount)}</td>
+            <td class="num">${number(item.effectiveCount)}</td>
+            <td class="num">${percent(item.attendanceRate)}</td>
+            <td class="num">${number(item.signedStoreCount)}</td>
+            <td class="num">${number(item.totalRecords)}</td>
+            <td class="num">${number(item.pendingCount)}</td>
+            <td class="num">${number(item.timePendingCount)}</td>
+            <td class="num">${number(item.locationPendingCount)}</td>
+          </tr>
+        `);
+        document.getElementById("orgRows").innerHTML =
+          rows.join("") || `<tr><td colspan="12">沒有符合條件的組織統計資料</td></tr>`;
       }
 
       function exportDepartmentCsv() {
@@ -735,6 +825,7 @@
           "已簽到店舖",
           "全部紀錄",
           "疑似重複",
+          "時間待確認",
           "位置待確認",
           "場地未設定",
           "裝置待確認",
@@ -749,6 +840,7 @@
           item.signedStoreCount,
           item.totalRecords,
           item.duplicateCount,
+          item.timePendingCount,
           item.locationPendingCount,
           item.venueMissingCount,
           item.devicePendingCount,
