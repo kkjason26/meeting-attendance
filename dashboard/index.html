@@ -193,7 +193,7 @@
 
     .kpis {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -371,14 +371,9 @@
             <div class="sub" id="kpiExpected">預計 0 人</div>
           </div>
           <div class="kpi">
-            <div class="label">店舖出席率</div>
-            <div class="value" id="kpiStoreRate">—</div>
-            <div class="sub" id="kpiStoreCount">已出席 0／預計 0 店</div>
-          </div>
-          <div class="kpi">
             <div class="label">人員出席率</div>
             <div class="value" id="kpiRate">—</div>
-            <div class="sub">依店舖名稱＋姓名去重</div>
+            <div class="sub">依課別場次人數設定計算</div>
           </div>
           <div class="kpi warn">
             <div class="label">時間待確認</div>
@@ -393,12 +388,12 @@
           <div class="kpi warn">
             <div class="label">全部待確認</div>
             <div class="value" id="kpiPending">0</div>
-            <div class="sub">時間、位置、場地或裝置需人工確認</div>
+            <div class="sub">時間、位置或場地需人工確認</div>
           </div>
           <div class="kpi">
             <div class="label">全部簽到紀錄</div>
             <div class="value" id="kpiTotal">0</div>
-            <div class="sub" id="kpiStores">已簽到店舖 0 店</div>
+            <div class="sub" id="kpiStores">有效店舖 0 店</div>
           </div>
         </div>
       </section>
@@ -415,7 +410,7 @@
                 <th>場次</th>
                 <th>場次名稱</th>
                 <th class="num">預計店舖</th>
-                <th class="num">已出席店舖</th>
+                <th class="num">有效店舖</th>
                 <th class="num">店舖出席率</th>
                 <th class="num">預計人員</th>
                 <th class="num">有效人員</th>
@@ -445,8 +440,8 @@
               <tr>
                 <th>場次</th>
                 <th>課別</th>
-                <th class="num">有效出席</th>
-                <th class="num">已簽到店舖</th>
+                <th class="num">有效人員</th>
+                <th class="num">有效店舖</th>
                 <th class="num">全部紀錄</th>
                 <th class="num">疑似重複</th>
                 <th class="num">時間待確認</th>
@@ -475,8 +470,8 @@
                 <th>課別</th>
                 <th>匹配場地</th>
                 <th>地址</th>
-                <th class="num">有效出席</th>
-                <th class="num">已簽到店舖</th>
+                <th class="num">有效人員</th>
+                <th class="num">有效店舖</th>
                 <th class="num">全部紀錄</th>
                 <th class="num">疑似重複</th>
                 <th class="num">時間待確認</th>
@@ -493,7 +488,7 @@
       <section class="card" id="orgCard">
         <div class="section-title">
           <h2>本部／部別／課別出席率分析</h2>
-          <span class="updated">預計店舖／人員來源：「營業課別對照」；出席依有效資料去重</span>
+          <span class="updated">預計店舖／人員來源：「課別場次人數設定」；有效只看時間與定位</span>
         </div>
         <div class="toolbar" style="margin-bottom:12px">
           <div class="filters">
@@ -515,7 +510,7 @@
                 <th>營業課</th>
                 <th>課別代號</th>
                 <th class="num">預計店舖</th>
-                <th class="num">已出席店舖</th>
+                <th class="num">有效店舖</th>
                 <th class="num">店舖出席率</th>
                 <th class="num">預計人員</th>
                 <th class="num">有效人員</th>
@@ -750,33 +745,34 @@
         });
       }
 
-      function renderKpis() {
+            function renderKpis() {
         const total = getSelectedEventSummary();
         document.getElementById("generatedAt").textContent =
           `更新時間：${lastData.generatedAt || "—"}`;
 
         const expectedPeople = Number(total.expectedPeople || total.expectedCount || 0);
-        const expectedStores = Number(total.expectedStores || 0);
         const effectivePeople = Number(total.effectiveCount || 0);
-        const signedStores = Number(total.signedStoreCount || 0);
+        const expectedStores = Number(total.expectedStores || 0);
+        const effectiveStores = Number(total.signedStoreCount || 0);
         const peopleRate = expectedPeople > 0 ? effectivePeople / expectedPeople : "";
-        const storeRate = expectedStores > 0 ? signedStores / expectedStores : "";
+        const storeRate = expectedStores > 0 ? effectiveStores / expectedStores : "";
 
         document.getElementById("kpiEffective").textContent = number(effectivePeople);
         document.getElementById("kpiExpected").textContent =
-          `預計 ${number(expectedPeople)} 人`;
-        document.getElementById("kpiStoreRate").textContent = percent(storeRate);
-        document.getElementById("kpiStoreCount").textContent =
-          `已出席 ${number(signedStores)}／預計 ${number(expectedStores)} 店`;
+          `預計 ${number(expectedPeople)} 人｜有效店舖 ${number(effectiveStores)} / 預計 ${number(expectedStores)} 店`;
         document.getElementById("kpiRate").textContent = percent(peopleRate);
+        document.getElementById("kpiRate").parentElement.querySelector(".sub").textContent =
+          `店舖出席率 ${percent(storeRate)}`;
         document.getElementById("kpiTimePending").textContent = number(total.timePendingCount);
         document.getElementById("kpiLocationPending").textContent =
           number(Number(total.locationPendingCount || 0) + Number(total.venueMissingCount || 0));
         document.getElementById("kpiPending").textContent = number(total.pendingCount);
         document.getElementById("kpiTotal").textContent = number(total.totalRecords);
         document.getElementById("kpiStores").textContent =
-          `有效店舖 ${number(signedStores)} 店`;
+          `有效店舖 ${number(effectiveStores)} 店`;
       }
+
+
 
       function renderEventOptions() {
         const current = eventFilter.value;
@@ -790,34 +786,41 @@
         eventFilter.value = current;
       }
 
-      function renderEvents() {
+            function renderEvents() {
         const selectedEvent = eventFilter.value;
         const events = (lastData.events || []).filter(event =>
           !selectedEvent || event.eventCode === selectedEvent
         );
 
         const rows = events.map(event => {
-          const statusClass = event.pendingCount > 0 || event.duplicateCount > 0
+          const statusClass = event.pendingCount > 0
             ? "status-warn"
             : event.totalRecords > 0
               ? "status-ok"
               : "status-bad";
-          const statusText = event.pendingCount > 0 || event.duplicateCount > 0
+          const statusText = event.pendingCount > 0
             ? "需確認"
             : event.totalRecords > 0
               ? "正常"
               : "尚無資料";
 
+          const expectedStores = Number(event.expectedStores || 0);
+          const effectiveStores = Number(event.signedStoreCount || 0);
+          const storeRate = expectedStores > 0 ? effectiveStores / expectedStores : "";
+          const expectedPeople = Number(event.expectedPeople || event.expectedCount || 0);
+          const effectivePeople = Number(event.effectiveCount || 0);
+          const peopleRate = expectedPeople > 0 ? effectivePeople / expectedPeople : "";
+
           return `
             <tr data-event="${escapeHtml(event.eventCode)}" style="cursor:pointer">
               <td><strong>${escapeHtml(event.eventCode)}</strong></td>
               <td>${escapeHtml(event.eventName)}</td>
-              <td class="num">${number(event.expectedStores)}</td>
-              <td class="num">${number(event.signedStoreCount)}</td>
-              <td class="num">${percent(event.storeAttendanceRate)}</td>
-              <td class="num">${number(event.expectedPeople || event.expectedCount)}</td>
-              <td class="num">${number(event.effectiveCount)}</td>
-              <td class="num">${percent(event.peopleAttendanceRate || event.attendanceRate)}</td>
+              <td class="num">${number(expectedStores)}</td>
+              <td class="num">${number(effectiveStores)}</td>
+              <td class="num">${percent(storeRate)}</td>
+              <td class="num">${number(expectedPeople)}</td>
+              <td class="num">${number(effectivePeople)}</td>
+              <td class="num">${percent(peopleRate)}</td>
               <td class="num">${number(event.totalRecords)}</td>
               <td class="num">${number(event.duplicateCount)}</td>
               <td class="num">${number(event.timePendingCount)}</td>
@@ -843,6 +846,8 @@
           });
         });
       }
+
+
 
       function renderDepartments() {
         const deptCard = document.getElementById("deptCard");
@@ -945,7 +950,7 @@
           return lastData.organization[level] || [];
         }
 
-        // 指定場次：用該場次的課別明細即時彙總。
+        // 指定場次：用該場次的課別明細即時彙總，避免組織分析仍顯示全體資料。
         const eventCode = eventFilter.value;
         const courseMeta = new Map();
         (lastData.organization.courses || []).forEach(item => {
@@ -957,22 +962,16 @@
           .filter(item => item.eventCode === eventCode)
           .map(item => {
             const meta = courseMeta.get(String(item.department || "")) || {};
-            const expectedPeople = Number(meta.expectedPeople || meta.expectedCount || 0);
-            const expectedStores = Number(meta.expectedStores || expectedPeople || 0);
-            const effectivePeople = Number(item.effectiveCount || 0);
-            const signedStores = Number(item.signedStoreCount || 0);
             return {
               headquarters: meta.headquarters || "",
               division: meta.division || "",
               departmentName: meta.departmentName || item.department || "",
               departmentCode: meta.departmentCode || "",
-              expectedCount: expectedPeople,
-              expectedPeople,
-              expectedStores,
-              effectiveCount: effectivePeople,
-              signedStoreCount: signedStores,
-              storeAttendanceRate: expectedStores > 0 ? signedStores / expectedStores : "",
-              peopleAttendanceRate: expectedPeople > 0 ? effectivePeople / expectedPeople : "",
+              expectedCount: Number(meta.expectedPeople || meta.expectedCount || 0),
+              expectedPeople: Number(meta.expectedPeople || meta.expectedCount || 0),
+              expectedStores: Number(meta.expectedStores || 0),
+              effectiveCount: Number(item.effectiveCount || 0),
+              signedStoreCount: Number(item.signedStoreCount || 0),
               totalRecords: Number(item.totalRecords || 0),
               pendingCount: Number(item.pendingCount || 0),
               timePendingCount: Number(item.timePendingCount || 0),
@@ -1008,7 +1007,7 @@
           }
 
           const target = map.get(key);
-          target.expectedCount += Number(item.expectedPeople || item.expectedCount || 0);
+          target.expectedCount += Number(item.expectedCount || 0);
           target.expectedPeople += Number(item.expectedPeople || item.expectedCount || 0);
           target.expectedStores += Number(item.expectedStores || 0);
           target.effectiveCount += Number(item.effectiveCount || 0);
@@ -1019,11 +1018,7 @@
           target.locationPendingCount += Number(item.locationPendingCount || 0);
         });
 
-        return Array.from(map.values()).map(item => {
-          item.storeAttendanceRate = item.expectedStores > 0 ? item.signedStoreCount / item.expectedStores : "";
-          item.peopleAttendanceRate = item.expectedPeople > 0 ? item.effectiveCount / item.expectedPeople : "";
-          return item;
-        }).sort((a, b) =>
+        return Array.from(map.values()).sort((a, b) =>
           [a.headquarters, a.division].join("").localeCompare([b.headquarters, b.division].join(""), "zh-Hant")
         );
       }
@@ -1049,7 +1044,7 @@
         });
       }
 
-      function renderOrganization() {
+            function renderOrganization() {
         if (!lastData || !lastData.organization) return;
         const level = orgLevelFilter.value || "headquarters";
         const keyword = orgSearch.value.trim().toLowerCase();
@@ -1061,10 +1056,10 @@
         });
         const rows = filtered.map(item => {
           const expectedStores = Number(item.expectedStores || 0);
-          const signedStores = Number(item.signedStoreCount || 0);
+          const effectiveStores = Number(item.signedStoreCount || 0);
+          const storeRate = expectedStores > 0 ? effectiveStores / expectedStores : "";
           const expectedPeople = Number(item.expectedPeople || item.expectedCount || 0);
           const effectivePeople = Number(item.effectiveCount || 0);
-          const storeRate = expectedStores > 0 ? signedStores / expectedStores : "";
           const peopleRate = expectedPeople > 0 ? effectivePeople / expectedPeople : "";
 
           return `
@@ -1074,7 +1069,7 @@
               <td>${escapeHtml(item.departmentName || "—")}</td>
               <td><strong>${escapeHtml(item.departmentCode || "—")}</strong></td>
               <td class="num">${number(expectedStores)}</td>
-              <td class="num">${number(signedStores)}</td>
+              <td class="num">${number(effectiveStores)}</td>
               <td class="num">${percent(storeRate)}</td>
               <td class="num">${number(expectedPeople)}</td>
               <td class="num">${number(effectivePeople)}</td>
@@ -1089,6 +1084,8 @@
         document.getElementById("orgRows").innerHTML =
           rows.join("") || `<tr><td colspan="14">沒有符合條件的組織統計資料</td></tr>`;
       }
+
+
 
       function exportDepartmentCsv() {
         if (!lastData) return;
@@ -1110,7 +1107,7 @@
           "場次名稱",
           "課別",
           "有效出席",
-          "已簽到店舖",
+          "有效店舖",
           "全部紀錄",
           "疑似重複",
           "時間待確認",
